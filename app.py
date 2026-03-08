@@ -16,7 +16,7 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-st.title("Coach Alan Wu")
+st.markdown("<h1 style='text-align: center; color: white;'>Meet Coach Alan!</h1>", unsafe_allow_html=True)
 feedback = {
     "elbow_angle": 170,
     "shoulder_ok": True,
@@ -67,6 +67,7 @@ while True:
     if not ret:
         break
     
+    frame = cv2.flip(frame, 1)  # mirror image for better UX
     frame = draw_feedback(frame, feedback)
     
     # streamlit needs RGB not BGR
