@@ -2,6 +2,63 @@ import streamlit as st
 import cv2
 import mediapipe as mp
 
+st.set_page_config(page_title="Coach Alan Wu", layout="wide")
+USERS = {
+    "alan": "coachingstart",
+    "judge": "demo"
+}
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+if "login_username" not in st.session_state:
+    st.session_state.login_username = ""
+
+if "login_password" not in st.session_state:
+    st.session_state.login_password = ""
+
+def show_login():
+    left, center, right = st.columns([1, 2, 1])
+
+    with center:
+        with st.container(border=True):
+            st.title("🏸 Coach Alan Wu")
+            st.write("Sign in to use the badminton swing coach.")
+
+            with st.form("login_form"):
+                username = st.text_input("Username", key="login_username")
+                password = st.text_input("Password", type="password", key="login_password")
+                submitted = st.form_submit_button("Log in", use_container_width=True)
+
+            if submitted:
+                if username in USERS and USERS[username] == password:
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.success(f"Welcome, {username}!")
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password.")
+
+def show_logout():
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        st.write(f"Logged in as: **{st.session_state.username}**")
+    with col2:
+        if st.button("Log out"):
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.session_state.login_username = ""
+            st.session_state.login_password = ""
+            st.rerun()
+
+if not st.session_state.logged_in:
+    show_login()
+    st.stop()
+
+show_logout()
 st.title("Coach Alan Wu")
 feedback = {
     "elbow_angle": 170,
@@ -13,7 +70,7 @@ feedback = {
 st.markdown("""
 <style>
     .stApp {
-        background-color: #102911;
+        background-color: #040c29;
     }
 </style>
 """, unsafe_allow_html=True)
