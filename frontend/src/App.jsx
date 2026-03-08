@@ -9,9 +9,9 @@ function App() {
 
   if (page === 'home') {
     return (
-      <div style={{ background: '#040c29', color: 'white', height: '100vh', textAlign: 'center' }}>
-        <h1>🏸 Coach Alan Wu</h1>
-        <p>Select a shot to practice</p>
+      <div className = "home-page">
+        <h1>Ready to train?</h1>
+        <button onClick={() => setPage('coaching')}>Resources</button>
         <button onClick={() => setPage('coaching')}>Start Coaching</button>
       </div>
     )
