@@ -12,9 +12,12 @@ elevenlabs = ElevenLabs(
 def play_audio(input):
     audio = elevenlabs.text_to_speech.convert(
         text=input,
-        voice_id="JBFqnCBsd6RMkjVDRZzb",
+        voice_id="KLZOWyG48RjZkAAjuM89",
         model_id="eleven_multilingual_v2",
         output_format="mp3_44100_128",
+        voice_settings={
+            "speed": 1.5  
+        }
     )
 
     play(audio)

@@ -292,7 +292,7 @@ def handle_frame_landmarks(rgb_image, detection_result, state, move, mode, curr_
     
 
         if (state.current_phase == phases.Phase.CONTACT or state.current_phase == phases.Phase.CRUX):
-            speak_async(feedback)
+            play_sound(feedback)
         
         #update current phase
         state.prev_phase = state.current_phase

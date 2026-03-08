@@ -48,11 +48,11 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+if "video_holder" not in st.session_state:
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    st.session_state.video_holder = cv2.VideoWriter("session.mp4", fourcc, 30, (w, h))
 
-fourcc = cv2.VideoWriter_fourcc(*"avc1")
-video_holder = cv2.VideoWriter("session.mp4", fourcc, 30, (w, h))
-
- 
+video_holder = st.session_state.video_holder
 
 frame_holder = st.empty()
 stop = st.button("Stop")
@@ -103,6 +103,8 @@ while not stop:
     frame_holder.image(annotated_frame, channels="RGB", width='stretch')
 
 
+
+
     
 
 
@@ -115,6 +117,6 @@ while not stop:
     
 cap.release()
 video_holder.release()
-
+del st.session_state.video_holder
 # gemini feedback
 st.write(gemini_api.get_gemini())
