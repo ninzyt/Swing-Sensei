@@ -6,10 +6,10 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+from state import SwingState
 import texttospeech
 import calculations
 import phases
-import collections
 import os
 
 # These are the lines connecting the body joints
@@ -29,242 +29,220 @@ def play_sound(text):
     thread.daemon = True
     thread.start()
 
-if __name__ == "__main__":
-    current_phase = phases.Phase.REST
-    velocity_history = collections.deque(maxlen=10)
-    prev_velocity_history = collections.deque(maxlen=10)
+
+def set_state(state, left_wrist, left_shoulder, smoothed_cvx, smoothed_cvy):
+
+    prev_phase = state.prev_phase
+    # total speed
+    speed = math.sqrt(smoothed_cvx**2 + smoothed_cvy**2)
+
+    # direction angle in degrees (0=right, 90=up, -90=down, 180=left)
+    angle = math.degrees(math.atan2(-smoothed_cvy, smoothed_cvx))
+    if prev_phase == phases.Phase.BW_SWING and smoothed_cvx < 0 and speed > 150:
+        phase = phases.Phase.CRUX
+
+    elif speed > 150 and 10 < angle < 60:
+        phase = phases.Phase.BW_SWING
+        state.contact_fired = False
+
+    elif speed > 150 and (angle > 120 or angle < -90):
+        phase = phases.Phase.FOLLOW_THROUGH
+
+    elif speed < 50 and left_wrist.y > left_shoulder.y:
+        phase = phases.Phase.REST
+        state.contact_fired = False
+
+
+    else:
+        if prev_phase in (phases.Phase.CONTACT, phases.Phase.CRUX):
+            phase = phases.Phase.FOLLOW_THROUGH
+        else:
+            phase = prev_phase
     
 
-       # initialize prevs
-    prev_wrist = None
-    prev_time = time.time()
-    prev_velocity = None
-    prev_phase = phases.Phase.REST
-    prev_smoothed_cvy = 0 
 
-    # for contact detection
-    wrist_y_history = collections.deque(maxlen=5)
-    contact_fired = False
-    upward_motion_seen = False
+    # CONTACT: wrist was going up (vy negative), now going down (vy positive) = peak
+    if (
+        phase == phases.Phase.FOLLOW_THROUGH
+        and prev_phase == phases.Phase.FOLLOW_THROUGH
+        and not state.contact_fired
+        and state.prev_smoothed_cvy < 0
+        and smoothed_cvy > 0
+    ):
+        phase = phases.Phase.CONTACT
+        state.contact_fired = True
+
+    return phase
+
+
+def print_phase(state, elbow_angle, armpit_angle):
+    match (state.current_phase):
+        case phases.Phase.REST:
+            print("rest")
+        case phases.Phase.BW_SWING:
+            print("back swing")
+        case phases.Phase.CRUX:
+            print(f'elbowangle: {elbow_angle}')
+            print(f'armpitangle: {armpit_angle}')
+            print("pause")
+            #play_sound("pause")
+        case phases.Phase.FOLLOW_THROUGH:
+            print("swinging")
+        case phases.Phase.CONTACT:
+            print(f'elbowangle: {elbow_angle}')
+            print(f'armpitangle: {armpit_angle}')
+            print("contact")
+            #play_sound("contact")
+
+
+def get_feedback(state, move, mode, elbow_angle, armpit_angle):
+    feedback = ""
+    if (state.current_phase == phases.Phase.CRUX and move == "pre hit"):
+        #print(f'crux{elbow_angle}')
+        #print(f'crux{armpit_angle}')
+        filename = f"crux_{int(time.time())}.jpg"
+        # cv2.imwrite(filename, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+        
+        if (mode == "elbow"):
+            if elbow_angle < 125:
+                feedback = "bad"
+            elif elbow_angle < 145:
+                feedback = "good"
+            elif elbow_angle <= 170:
+                feedback = "perfect"
+            elif elbow_angle <= 180:
+                feedback = "good"
+            else:
+                feedback = "bad"
+
+
+        if (mode == "arm"):
+            if armpit_angle < 95:
+                feedback = "bad"
+            elif armpit_angle < 110:
+                feedback = "good"
+            elif armpit_angle <= 130:
+                feedback = "perfect"
+            elif armpit_angle <= 145:
+                feedback = "good"
+            else:
+                feedback = "bad"
+
+            
+    if (state.current_phase == phases.Phase.CONTACT and move == "on hit"):
+        #print(f'contact{elbow_angle}')
+        #print(f'contact{armpit_angle}')
+        filename = f"contact_{int(time.time())}.jpg"
+        # cv2.imwrite(filename, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+
+        if (mode == "elbow"):
+            if elbow_angle < 160:
+                feedback = "bad"
+            elif elbow_angle < 170:
+                feedback = "good"
+            elif elbow_angle <= 178:
+                feedback = "perfect"
+            elif elbow_angle <= 182:
+                feedback = "good"
+            else:
+                feedback = "bad"
+
+        if (mode == "arm"):
+            if armpit_angle < 35:
+                feedback = "bad"
+            elif armpit_angle < 50:
+                feedback = "good"
+            elif armpit_angle <= 70:
+                feedback = "perfect"
+            elif armpit_angle <= 80:
+                feedback = "good"
+            else:
+                feedback = "bad"
+
+    return feedback
+
+
+
+def handle_frame_landmarks(rgb_image, detection_result, state, move, mode, curr_velocity):
+
+    annotated_image = np.copy(rgb_image)
+    h, w = annotated_image.shape[:2]
+
+    for pose_landmarks in detection_result.pose_landmarks:
+        # Draw lines between joints
+        for start_idx, end_idx in POSE_CONNECTIONS:
+            start = pose_landmarks[start_idx]
+            end = pose_landmarks[end_idx]
+            
+            cv2.line(annotated_image,
+                (int(start.x * w), int(start.y * h)),
+                (int(end.x * w), int(end.y * h)),
+                (0, 255, 0), 2)
+            
+
+        # Draw dots on each joint
+        for landmark in pose_landmarks:
+            cv2.circle(annotated_image,
+                (int(landmark.x * w), int(landmark.y * h)),
+                4, (0, 0, 255), -1)
+
+        left_elbow = pose_landmarks[13]
+        left_shoulder = pose_landmarks[11]
+        left_wrist = pose_landmarks[15] 
+        left_hip = pose_landmarks[23] 
+
+        
+
+        cv2.circle(annotated_image,
+            (int(left_elbow.x * w), int(left_elbow.y * h)),
+            20, (255, 0, 0), -1)
+        cv2.line(annotated_image,
+            (int(left_elbow.x * w), int(left_elbow.y * h)),
+            (int(left_shoulder.x * w), int(left_shoulder.y * h)),
+            (255, 0, 0), 2)
+        cv2.line(annotated_image,
+            (int(left_elbow.x * w), int(left_elbow.y * h)),
+            (int(left_wrist.x * w), int(left_wrist.y * h)),
+            (255, 0, 0), 2)
+
+        # arm moving down  = positive y
+        # arm moving right  = positive x
+        state.velocity_history.append(curr_velocity)
+        state.prev_velocity_history.append(state.prev_velocity)
+        smoothed_cvx = sum(v[0] for v in state.velocity_history) / len(state.velocity_history) # it gets the vx from each tuple
+        smoothed_cvy = sum(v[1] for v in state.velocity_history) / len(state.velocity_history) # it gets the vy from each tuple
+        smoothed_pvx = sum(v[0] for v in state.prev_velocity_history) / len(state.prev_velocity_history) # it gets the vx from each tuple
+        smoothed_pvy = sum(v[1] for v in state.prev_velocity_history) / len(state.prev_velocity_history) # it gets the vy from each tuple
+
+        elbow_angle = calculations.calculate_angle(left_shoulder, left_elbow, left_wrist)
+        armpit_angle = calculations.calculate_angle(left_hip, left_shoulder, left_elbow)
+
+        state.current_phase = set_state(state, left_wrist, left_shoulder, smoothed_cvx, smoothed_cvy)
+        
+        #print(f"speed: {speed:.2f}, prev_speed: {prev_speed:.2f}, angle: {angle:.2f}")
+        print_phase(state, elbow_angle, armpit_angle)
+
+        feedback = get_feedback(state, move, mode, elbow_angle, armpit_angle)
+
+                
     
+
+        if (state.current_phase == phases.Phase.CONTACT or state.current_phase == phases.Phase.CRUX):
+            play_sound(feedback)
+        
+        #update current phase
+        state.prev_phase = state.current_phase
+        state.prev_smoothed_cvy = smoothed_cvy
+                            
+    return annotated_image
+
+
+
+def main():
+    state = SwingState()
 
     move = "on hit"
     mode = "elbow"
-
-    def draw_landmarks_on_image(rgb_image, detection_result, prev_velocity, curr_velocity):
-        global current_phase
-        global prev_phase
-        global prev_smoothed_cvy
-        global contact_fired
-        global upward_motion_seen
-        global wrist_y_history
-        annotated_image = np.copy(rgb_image)
-        h, w = annotated_image.shape[:2]
-        
-
-
-        
-
-        for pose_landmarks in detection_result.pose_landmarks:
-            # Draw lines between joints
-            for start_idx, end_idx in POSE_CONNECTIONS:
-                start = pose_landmarks[start_idx]
-                end = pose_landmarks[end_idx]
-                
-                cv2.line(annotated_image,
-                    (int(start.x * w), int(start.y * h)),
-                    (int(end.x * w), int(end.y * h)),
-                    (0, 255, 0), 2)
-                
-
-            # Draw dots on each joint
-            for landmark in pose_landmarks:
-                cv2.circle(annotated_image,
-                    (int(landmark.x * w), int(landmark.y * h)),
-                    4, (0, 0, 255), -1)
-
-            left_elbow = pose_landmarks[13]
-            left_shoulder = pose_landmarks[11]
-            left_wrist = pose_landmarks[15] 
-            left_hip = pose_landmarks[23] 
-
-            
-
-            cv2.circle(annotated_image,
-                (int(left_elbow.x * w), int(left_elbow.y * h)),
-                20, (255, 0, 0), -1)
-            cv2.line(annotated_image,
-                (int(left_elbow.x * w), int(left_elbow.y * h)),
-                (int(left_shoulder.x * w), int(left_shoulder.y * h)),
-                (255, 0, 0), 2)
-            cv2.line(annotated_image,
-                (int(left_elbow.x * w), int(left_elbow.y * h)),
-                (int(left_wrist.x * w), int(left_wrist.y * h)),
-                (255, 0, 0), 2)
-
-            # arm moving down  = positive y
-            # arm moving right  = positive x
-            velocity_history.append(curr_velocity)
-            prev_velocity_history.append(prev_velocity)
-            wrist_y_history.append(left_wrist.y)
-            smoothed_cvx = sum(v[0] for v in velocity_history) / len(velocity_history) # it gets the vx from each tuple
-            smoothed_cvy = sum(v[1] for v in velocity_history) / len(velocity_history) # it gets the vy from each tuple
-            smoothed_pvx = sum(v[0] for v in prev_velocity_history) / len(prev_velocity_history) # it gets the vx from each tuple
-            smoothed_pvy = sum(v[1] for v in prev_velocity_history) / len(prev_velocity_history) # it gets the vy from each tuple
-
-            # total speed
-            speed = math.sqrt(smoothed_cvx**2 + smoothed_cvy**2)
-            prev_speed = math.sqrt(smoothed_pvx**2 + smoothed_pvy**2)
-
-            # direction angle in degrees (0=right, 90=up, -90=down, 180=left)
-            angle = math.degrees(math.atan2(-smoothed_cvy, smoothed_cvx))
-
-            # for contact detection
-            if smoothed_cvy < -80:
-                upward_motion_seen = True
-            
-        
-            #print(f"speed: {speed:.2f} | angle: {angle:.2f} | wrist_y: {left_wrist.y:.2f} | shoulder_y: {left_shoulder.y:.2f} | vx: {smoothed_cvx:.2f} | vy: {smoothed_cvy:.2f}")
-            #print(f"prevspeed: {prev_speed:.2f} | wrist_x: {left_wrist.x:.2f} | shoulder_y: {left_shoulder.x:.2f}")
-            print(left_wrist.y)
-            if prev_phase == phases.Phase.BW_SWING and smoothed_cvx < 0 and speed > 150:
-                current_phase = phases.Phase.CRUX
-
-            elif speed > 150 and 10 < angle < 60:
-                current_phase = phases.Phase.BW_SWING
-                contact_fired = False
-
-            elif speed > 150 and (angle > 120 or angle < -90):
-                current_phase = phases.Phase.FOLLOW_THROUGH
-
-            elif speed < 50 and left_wrist.y > left_shoulder.y:
-                current_phase = phases.Phase.REST
-                contact_fired = False
-                upward_motion_seen = False
-
-            else:
-                if prev_phase in (phases.Phase.CONTACT, phases.Phase.CRUX):
-                    current_phase = phases.Phase.FOLLOW_THROUGH
-                else:
-                    current_phase = prev_phase
-
-
-            # CONTACT: wrist was going up (vy negative), now going down (vy positive) = peak
-            if (
-                current_phase == phases.Phase.FOLLOW_THROUGH
-                and prev_phase == phases.Phase.FOLLOW_THROUGH
-                and not contact_fired
-                and prev_smoothed_cvy < 0
-                and smoothed_cvy > 0
-            ):
-                current_phase = phases.Phase.CONTACT
-                contact_fired = True
-
-        
-           
-            
-            
-            elbow_angle = calculations.calculate_angle(left_shoulder, left_elbow, left_wrist)
-            armpit_angle = calculations.calculate_angle(left_hip, left_shoulder, left_elbow)
-
-            #print(f"speed: {speed:.2f}, prev_speed: {prev_speed:.2f}, angle: {angle:.2f}")
-            match (current_phase):
-                case phases.Phase.REST:
-                    print("rest")
-                case phases.Phase.BW_SWING:
-                    print("back swing")
-                case phases.Phase.CRUX:
-                    print(f'elbowangle: {elbow_angle}')
-                    print(f'armpitangle: {armpit_angle}')
-                    print("pause")
-                    #play_sound("pause")
-                case phases.Phase.FOLLOW_THROUGH:
-                    print("swinging")
-                case phases.Phase.CONTACT:
-                    print(f'elbowangle: {elbow_angle}')
-                    print(f'armpitangle: {armpit_angle}')
-                    print("contact")
-                    #play_sound("contact")
-                    
-
-            feedback = ""
-            if (current_phase == phases.Phase.CRUX and move == "pre hit"):
-                #print(f'crux{elbow_angle}')
-                #print(f'crux{armpit_angle}')
-                filename = f"crux_{int(time.time())}.jpg"
-                # cv2.imwrite(filename, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
-                
-                if (mode == "elbow"):
-                    if elbow_angle < 125:
-                        feedback = "bad"
-                    elif elbow_angle < 145:
-                        feedback = "good"
-                    elif elbow_angle <= 170:
-                        feedback = "perfect"
-                    elif elbow_angle <= 180:
-                        feedback = "good"
-                    else:
-                        feedback = "bad"
-
-
-                if (mode == "arm"):
-                    if armpit_angle < 95:
-                        feedback = "bad"
-                    elif armpit_angle < 110:
-                        feedback = "good"
-                    elif armpit_angle <= 130:
-                        feedback = "perfect"
-                    elif armpit_angle <= 145:
-                        feedback = "good"
-                    else:
-                        feedback = "bad"
-
-                    
-
-            if (current_phase == phases.Phase.CONTACT and move == "on hit"):
-                #print(f'contact{elbow_angle}')
-                #print(f'contact{armpit_angle}')
-                filename = f"contact_{int(time.time())}.jpg"
-                # cv2.imwrite(filename, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
-
-                if (mode == "elbow"):
-                    if elbow_angle < 160:
-                        feedback = "bad"
-                    elif elbow_angle < 170:
-                        feedback = "good"
-                    elif elbow_angle <= 178:
-                        feedback = "perfect"
-                    elif elbow_angle <= 182:
-                        feedback = "good"
-                    else:
-                        feedback = "bad"
-
-                if (mode == "arm"):
-                    if armpit_angle < 35:
-                        feedback = "bad"
-                    elif armpit_angle < 50:
-                        feedback = "good"
-                    elif armpit_angle <= 70:
-                        feedback = "perfect"
-                    elif armpit_angle <= 80:
-                        feedback = "good"
-                    else:
-                        feedback = "bad"
-
-                    
-      
-
-            if (current_phase == phases.Phase.CONTACT or current_phase == phases.Phase.CRUX):
-                play_sound(feedback)
-            
-            #update current phase
-            prev_phase = current_phase
-            prev_smoothed_cvy = smoothed_cvy
-                       
-        
-                
-                        
-        return annotated_image
 
     # Load the model
     base_options = python.BaseOptions(model_asset_path='pose_landmarker.task')
@@ -302,20 +280,20 @@ if __name__ == "__main__":
         current_time = time.time()
 
         # get prev values
-        if (prev_wrist == None):
-            prev_wrist = current_wrist
+        if (state.prev_wrist is None):
+            state.prev_wrist = current_wrist
 
 
         # calculate velocity
-        if prev_wrist is not None and current_wrist is not None:
-            current_velocity = calculations.calculate_wrist_velocity(prev_wrist, current_wrist, current_time-prev_time, w, h)
+        if state.prev_wrist is not None and current_wrist is not None:
+            current_velocity = calculations.calculate_wrist_velocity(state.prev_wrist, current_wrist, current_time-state.prev_time, w, h)
         else:
             current_velocity = (0, 0)
-        if (prev_velocity == None):
-            prev_velocity = current_velocity
+        if (state.prev_velocity is None):
+            state.prev_velocity = current_velocity
 
 
-        annotated_frame = draw_landmarks_on_image(rgb_frame, detection_result, prev_velocity, current_velocity)
+        annotated_frame = handle_frame_landmarks(rgb_frame, detection_result, state, move, mode, current_velocity)
 
         # Show
         cv2.imshow("Pose", cv2.cvtColor(annotated_frame, cv2.COLOR_RGB2BGR))
@@ -323,12 +301,13 @@ if __name__ == "__main__":
         
 
         # update prev values
-        prev_wrist = current_wrist
-        prev_time = current_time
-        prev_velocity = current_velocity
+        state.prev_wrist = current_wrist
+        state.prev_time = current_time
+        state.prev_velocity = current_velocity
         
         # Press 'q' to quit
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-
+if __name__ == "__main__":
+    main()
