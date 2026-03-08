@@ -1,0 +1,157 @@
+/* ============================================================
+   Global page layout
+   ============================================================ */
+.home-page,
+.training-page,
+.resources-page {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  width: 100vw;
+  min-height: 100vh;
+  padding: 2rem;
+  box-sizing: border-box;
+
+  /* Radial gradient background — dark navy with a subtle glow in the centre */
+  background:
+    radial-gradient(ellipse at 50% 40%, #0d1f5c 0%, #040c29 65%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Soft ambient glow orbs in the background */
+.home-page::before,
+.home-page::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(80px);
+  opacity: 0.18;
+}
+
+.home-page::before {
+  width: 500px;
+  height: 500px;
+  background: #3b82f6;
+  top: -100px;
+  left: -120px;
+}
+
+.home-page::after {
+  width: 400px;
+  height: 400px;
+  background: #10b981;
+  bottom: -80px;
+  right: -100px;
+}
+
+/* ============================================================
+   Heading
+   ============================================================ */
+.home-page h1 {
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+  letter-spacing: -0.02em;
+
+  color: #ffffff;
+}
+
+/* ============================================================
+   Subtitle
+   ============================================================ */
+.home-subtitle {
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+  text-align: center;
+  max-width: 380px;
+}
+
+.home-subtitle em {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Yes button wrapper — pulse ring animation
+   ============================================================ */
+.yes-no-wrapper {
+  margin-top: 0.5rem;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Pulsing ring behind the yes button */
+.yes-no-wrapper::before {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid rgba(96, 165, 250, 0.5);
+  animation: pulse-ring 2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(0.9); opacity: 0.7; }
+  70%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* ============================================================
+   Badminton image — glow effect
+   ============================================================ */
+.home-image {
+  width: 280px;
+  height: auto;
+  margin-top: 0.5rem;
+  filter: drop-shadow(0 0 24px rgba(52, 211, 153, 0.35))
+          drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.home-image:hover {
+  filter: drop-shadow(0 0 36px rgba(52, 211, 153, 0.55))
+          drop-shadow(0 4px 16px rgba(0, 0, 0, 0.5));
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* ============================================================
+   Back buttons (training / resources pages)
+   ============================================================ */
+.home-page button,
+.training-page button,
+.resources-page button {
+  font-family: 'Poppins', system-ui, sans-serif;
+  padding: 0.45rem 1.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.home-page button:hover,
+.training-page button:hover,
+.resources-page button:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}

@@ -27,10 +27,14 @@ ENV/
 .env/
 virtualenv/
 
-# Environment variables
+# Environment variables — NEVER commit real credentials
 .env
 .env.*
 !.env.example
+
+# Supabase / secrets (extra safety net)
+secrets.toml
+.streamlit/secrets.toml
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
@@ -81,6 +85,7 @@ desktop.ini
 
 # Node
 node_modules/
+/package-lock.json
 frontend/build/
 frontend/.env.local
 .env
