@@ -20,16 +20,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 0.75rem;
   background-color: #040c29;
   width: 100vw;
   height: 100vh;
   padding: 2rem;
-  
 }
 
 .home-image {
   width: 300px;
   height: auto;
-  padding: 3em;
+  padding: 0.5em;
+  margin-bottom: 0;
+}
+
+.yes-no-wrapper {
+  margin-top: -1rem;
+}
+
+.home-page button,
+.training-page button {
+  padding: 0.3rem 1.2rem;
+  font-size: 0.9rem;
 }
