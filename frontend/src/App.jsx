@@ -2,6 +2,7 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import placeholder from './assets/alan-placeholder.svg'
 
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <h1>Ready to train?</h1>
         <button onClick={() => setPage('coaching')}>Resources</button>
         <button onClick={() => setPage('coaching')}>Start Coaching</button>
+        <img src={placeholder} alt="badminton" className='home-image'/>
       </div>
     )
   }

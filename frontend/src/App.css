@@ -25,4 +25,11 @@
   width: 100vw;
   height: 100vh;
   padding: 2rem;
+  
+}
+
+.home-image {
+  width: 300px;
+  height: auto;
+  padding: 3em;
 }
