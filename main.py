@@ -11,6 +11,7 @@ import texttospeech
 import calculations
 import phases
 import os
+import subprocess
 
 # These are the lines connecting the body joints
 from mediapipe.tasks.python.vision.pose_landmarker import PoseLandmarksConnections
@@ -24,10 +25,21 @@ def speak_async(text):
     thread.start()
 
 
+
+
+speech_process = None
+
 def play_sound(text):
-    thread = threading.Thread(target=lambda: os.system(f'say -r 250 "{text}"'))
-    thread.daemon = True
-    thread.start()
+    global speech_process
+
+    if not text:
+        return
+
+    # If something is already speaking, skip this one
+    if speech_process is not None and speech_process.poll() is None:
+        return
+
+    speech_process = subprocess.Popen(["say", "-r", "250", text])
 
 
 def set_state(state, left_wrist, left_shoulder, smoothed_cvx, smoothed_cvy):
@@ -97,67 +109,56 @@ def print_phase(state, elbow_angle, armpit_angle):
 
 def get_feedback(state, move, mode, elbow_angle, armpit_angle):
     feedback = ""
-    if (state.current_phase == phases.Phase.CRUX and move == "pre hit"):
-        #print(f'crux{elbow_angle}')
-        #print(f'crux{armpit_angle}')
-        filename = f"crux_{int(time.time())}.jpg"
-        # cv2.imwrite(filename, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
-        
-        if (mode == "elbow"):
-            if elbow_angle < 125:
-                feedback = "bad"
-            elif elbow_angle < 145:
+    
+    if state.current_phase == phases.Phase.CRUX and move == "pre hit":
+        if mode == "elbow":
+            if elbow_angle < 120:
+                feedback = "too tight"
+            elif elbow_angle < 140:
                 feedback = "good"
-            elif elbow_angle <= 170:
+            elif elbow_angle <= 160:
                 feedback = "perfect"
-            elif elbow_angle <= 180:
+            elif elbow_angle <= 172:
                 feedback = "good"
             else:
-                feedback = "bad"
+                feedback = "bend arm"
 
-
-        if (mode == "arm"):
-            if armpit_angle < 95:
-                feedback = "bad"
-            elif armpit_angle < 110:
+        elif mode == "arm":
+            if armpit_angle < 115:
+                feedback = "raise arm"
+            elif armpit_angle < 130:
                 feedback = "good"
-            elif armpit_angle <= 130:
+            elif armpit_angle <= 155:
                 feedback = "perfect"
-            elif armpit_angle <= 145:
+            elif armpit_angle <= 170:
                 feedback = "good"
             else:
-                feedback = "bad"
+                feedback = "lower arm"
 
-            
-    if (state.current_phase == phases.Phase.CONTACT and move == "on hit"):
-        #print(f'contact{elbow_angle}')
-        #print(f'contact{armpit_angle}')
-        filename = f"contact_{int(time.time())}.jpg"
-        # cv2.imwrite(filename, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
-
-        if (mode == "elbow"):
-            if elbow_angle < 160:
-                feedback = "bad"
-            elif elbow_angle < 170:
+    elif state.current_phase == phases.Phase.CONTACT and move == "on hit":
+        if mode == "elbow":
+            if elbow_angle < 165:
+                feedback = "extend arm"
+            elif elbow_angle < 172:
                 feedback = "good"
             elif elbow_angle <= 178:
                 feedback = "perfect"
-            elif elbow_angle <= 182:
+            elif elbow_angle <= 181:
                 feedback = "good"
             else:
-                feedback = "bad"
+                feedback = "bend arm"
 
-        if (mode == "arm"):
-            if armpit_angle < 35:
-                feedback = "bad"
-            elif armpit_angle < 50:
+        elif mode == "arm":
+            if armpit_angle < 40:
+                feedback = "lift arm"
+            elif armpit_angle < 52:
                 feedback = "good"
-            elif armpit_angle <= 70:
+            elif armpit_angle <= 72:
                 feedback = "perfect"
-            elif armpit_angle <= 80:
+            elif armpit_angle <= 85:
                 feedback = "good"
             else:
-                feedback = "bad"
+                feedback = "lower arm"
 
     return feedback
 
@@ -227,7 +228,7 @@ def handle_frame_landmarks(rgb_image, detection_result, state, move, mode, curr_
                 
     
 
-        if (state.current_phase == phases.Phase.CONTACT or state.current_phase == phases.Phase.CRUX):
+        if feedback and (state.current_phase == phases.Phase.CONTACT or state.current_phase == phases.Phase.CRUX):
             play_sound(feedback)
         
         #update current phase
@@ -242,7 +243,7 @@ def main():
     state = SwingState()
 
     move = "on hit"
-    mode = "elbow"
+    mode = "arm"
 
     # Load the model
     base_options = python.BaseOptions(model_asset_path='pose_landmarker.task')
@@ -277,6 +278,7 @@ def main():
             current_wrist = detection_result.pose_landmarks[0][15]
         else:
             current_wrist = None
+
         current_time = time.time()
 
         # get prev values
