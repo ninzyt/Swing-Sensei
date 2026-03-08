@@ -13,7 +13,7 @@ feedback = {
 st.markdown("""
 <style>
     .stApp {
-        background-color: #102911;
+        background-color: #040c29;
     }
 </style>
 """, unsafe_allow_html=True)
