@@ -14,6 +14,7 @@ import calculations
 import phases
 import os
 import main
+import gemini_api
 
 
 st.title("temp title")
@@ -44,17 +45,23 @@ cap = cv2.VideoCapture(0)  # 0 = default webcam
 
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+if "video_holder" not in st.session_state:
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
+    st.session_state.video_holder = cv2.VideoWriter("session.mp4", fourcc, 30, (w, h))
+
+video_holder = st.session_state.video_holder
 
 frame_holder = st.empty()
 stop = st.button("Stop")
+
 
 while not stop:
     ret, frame = cap.read()
     if not ret:
         break
-
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Convert frame to mediapipe format
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -89,6 +96,8 @@ while not stop:
 
 
     annotated_frame = main.handle_frame_landmarks(rgb_frame, detection_result, state, move, mode, current_velocity)
+    # add frame to the video 
+    video_holder.write(cv2.cvtColor(annotated_frame, cv2.COLOR_RGB2BGR)) 
     
     # Show
     frame_holder.image(annotated_frame, channels="RGB", width='stretch')
@@ -105,3 +114,8 @@ while not stop:
     state.prev_velocity = current_velocity
     
 cap.release()
+video_holder.release()
+del st.session_state.video_holder
+
+# gemini feedback
+st.write(gemini_api.get_gemini())

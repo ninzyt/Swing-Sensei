@@ -162,12 +162,56 @@ def get_feedback(state, move, mode, elbow_angle, armpit_angle):
 
     return feedback
 
+def draw_angle(annotated_image, point_a, point_b, point_c, elbow_angle, w, h):
+
+    Ax = int(point_a.x * w)
+    Ay = int(point_a.y * h)
+
+    Bx = int(point_b.x * w)
+    By = int(point_b.y * h)
+
+    Cx = int(point_c.x * w)
+    Cy = int(point_c.y * h)
+
+    angle1 = math.degrees(math.atan2(Ay - By, Ax - Bx))
+    angle2 = math.degrees(math.atan2(Cy - By, Cx - Bx))
+
+    #smaller interior arc
+    diff = (angle2 - angle1) % 360
+    if diff > 180:
+        angle1, angle2 = angle2, angle1
+        diff = (angle2 - angle1) % 360
+
+    radius = 100
+
+    cv2.ellipse(
+        annotated_image,
+        (Bx, By),               # center at elbow
+        (radius, radius),       # arc size
+        0,
+        angle1,
+        angle1 + diff,
+        (255, 0, 0),         
+        2
+    )
+
+    cv2.putText(
+        annotated_image,
+        f"{int(elbow_angle)}°",
+        (Bx + 10, By - 10),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        (255, 0, 0),
+        2
+    )
 
 
 def handle_frame_landmarks(rgb_image, detection_result, state, move, mode, curr_velocity):
 
     annotated_image = np.copy(rgb_image)
     h, w = annotated_image.shape[:2]
+
+    
 
     for pose_landmarks in detection_result.pose_landmarks:
         # Draw lines between joints
@@ -192,11 +236,13 @@ def handle_frame_landmarks(rgb_image, detection_result, state, move, mode, curr_
         left_wrist = pose_landmarks[15] 
         left_hip = pose_landmarks[23] 
 
-        
+        elbow_angle = calculations.calculate_angle(left_shoulder, left_elbow, left_wrist)
+        armpit_angle = calculations.calculate_angle(left_hip, left_shoulder, left_elbow)
 
-        cv2.circle(annotated_image,
-            (int(left_elbow.x * w), int(left_elbow.y * h)),
-            20, (255, 0, 0), -1)
+        draw_angle(annotated_image, left_shoulder, left_elbow, left_wrist, elbow_angle, w, h)
+        draw_angle(annotated_image, left_hip, left_shoulder, left_elbow, armpit_angle, w, h)
+
+        
         cv2.line(annotated_image,
             (int(left_elbow.x * w), int(left_elbow.y * h)),
             (int(left_shoulder.x * w), int(left_shoulder.y * h)),
@@ -215,8 +261,7 @@ def handle_frame_landmarks(rgb_image, detection_result, state, move, mode, curr_
         smoothed_pvx = sum(v[0] for v in state.prev_velocity_history) / len(state.prev_velocity_history) # it gets the vx from each tuple
         smoothed_pvy = sum(v[1] for v in state.prev_velocity_history) / len(state.prev_velocity_history) # it gets the vy from each tuple
 
-        elbow_angle = calculations.calculate_angle(left_shoulder, left_elbow, left_wrist)
-        armpit_angle = calculations.calculate_angle(left_hip, left_shoulder, left_elbow)
+       
 
         state.current_phase = set_state(state, left_wrist, left_shoulder, smoothed_cvx, smoothed_cvy)
         

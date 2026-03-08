@@ -22,8 +22,8 @@ class SwingState:
     prev_time: float = field(default_factory=time.time)
     prev_velocity: tuple | None = None
 
- 
     prev_smoothed_cvy: float = 0.0
 
-
     contact_fired: bool = False
+
+    screenshots: list = field(default_factory=list)
