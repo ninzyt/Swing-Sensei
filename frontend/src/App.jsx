@@ -14,6 +14,7 @@ function App() {
         <h1>Ready to train?</h1>
         <button onClick={() => setPage('coaching')}>Resources</button>
         <button onClick={() => setPage('coaching')}>Start Coaching</button>
+        <button onClick={() => setPage('coaching')}>See Summary</button>
         <img src={placeholder} alt="badminton" className='home-image'/>
       </div>
     )
